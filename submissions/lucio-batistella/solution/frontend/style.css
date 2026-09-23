@@ -42,6 +42,9 @@ button, input, select { font-family: inherit; }
 button { cursor: pointer; }
 a { color: inherit; }
 
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+.main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
 /* ---------- Header ---------- */
 .topbar {
   position: sticky; top: 0; z-index: 20;
@@ -176,8 +179,15 @@ a { color: inherit; }
   display: flex; flex-direction: column; padding: 24px 20px 20px; box-sizing: border-box;
 }
 .drawer.hidden { display: none; }
-.drawer-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 28px; }
+.sidebar-collapse-btn { display: none; }
+.drawer-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
 .drawer-brand .app-name { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.sidebar-nav { display: flex; flex-direction: column; gap: 2px; margin-bottom: 18px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 8px; border: none; border-radius: 8px;
+  background: transparent; color: var(--ink-2); font-size: 14px; font-weight: 600; text-align: left; width: 100%;
+}
+.nav-item.active { background: var(--primary-bg); color: var(--primary-fg); }
 .drawer-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--hairline); margin-bottom: 18px; }
 .drawer-avatar {
   flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--navy); color: #ffffff;
@@ -233,6 +243,31 @@ a { color: inherit; }
 
 /* ---------- Desktop ---------- */
 @media (min-width: 720px) {
+  .app-shell { flex-direction: row; }
+
+  /* Sidebar: fixa, persistente, recolhível — não é mais o drawer mobile "esticado" */
+  .drawer.hidden { display: flex; }
+  .drawer {
+    position: sticky; top: 0; align-self: flex-start; height: 100vh;
+    width: 240px; max-width: none; flex: none;
+    box-shadow: none; border-right: 1px solid var(--hairline);
+    transition: width 0.15s ease;
+  }
+  .drawer.collapsed { width: 68px; padding-left: 14px; padding-right: 14px; }
+  .drawer.collapsed .label { display: none; }
+  .drawer.collapsed .drawer-brand,
+  .drawer.collapsed .drawer-profile,
+  .drawer.collapsed .nav-item,
+  .drawer.collapsed .drawer-theme-btn,
+  .drawer.collapsed .drawer-logout { justify-content: center; }
+  .sidebar-collapse-btn {
+    display: flex; align-items: center; justify-content: center; margin-bottom: 16px; margin-left: auto;
+    width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: var(--ink-muted);
+  }
+  .drawer.collapsed .sidebar-collapse-btn { transform: rotate(180deg); margin: 0 auto 16px; }
+
+  #btn-menu { display: none; } /* hambúrguer só existe no mobile — no desktop a sidebar já está aberta; z-index da sidebar (51) já fica acima do overlay (40) do painel de filtro */
+
   .topbar { padding: 14px 40px; }
   .search-wrap { display: block; width: 240px; }
 
@@ -249,8 +284,26 @@ a { color: inherit; }
     width: 380px; border-radius: 14px; box-shadow: 0 12px 32px rgba(0,10,18,0.14);
     max-height: none;
   }
+
+  .kanban-board { padding: 20px 40px 32px; }
 }
 
 @media (min-width: 1300px) {
   .banner, .load-more { max-width: 1200px; }
 }
+
+/* ---------- Kanban ---------- */
+.kanban-board { padding: 12px 20px 24px; display: flex; gap: 16px; overflow-x: auto; align-items: flex-start; }
+.kanban-col { flex: 0 0 300px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 12px; max-height: calc(100vh - 220px); display: flex; flex-direction: column; }
+.kanban-col-head { display: flex; align-items: baseline; justify-content: space-between; padding: 4px 4px 10px; }
+.kanban-col-head .name { font-size: 14px; font-weight: 700; }
+.kanban-col-head .count { font-size: 12px; color: var(--ink-muted); }
+.kanban-col-body { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.kanban-card { background: var(--page); border: 1px solid var(--hairline); border-radius: 10px; padding: 10px; cursor: pointer; }
+.kanban-card .deal-card-head { gap: 8px; }
+.kanban-card .priority-badge { width: 38px; height: 38px; border-radius: 9px; }
+.kanban-card .priority-badge .score { font-size: 13px; }
+.kanban-card .priority-badge .tier { font-size: 7px; }
+.kanban-card .deal-account { font-size: 13px; }
+.kanban-card .deal-sub, .kanban-card .deal-meta { font-size: 11px; }
+.kanban-more { text-align: center; font-size: 11px; color: var(--ink-muted); padding: 8px 0 2px; }

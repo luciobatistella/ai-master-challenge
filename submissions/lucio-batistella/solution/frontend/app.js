@@ -19,6 +19,7 @@
     agent: "all",
   };
   const draft = { stage: "all", region: "all", manager: "all", agent: "all" };
+  let currentView = "list"; // "list" | "kanban"
 
   const els = {
     btnMenu: document.getElementById("btn-menu"),
@@ -49,6 +50,10 @@
     emptyState: document.getElementById("empty-state"),
     asOf: document.getElementById("data-asof"),
     attentionSection: document.getElementById("attention-section"),
+    btnCollapse: document.getElementById("btn-collapse"),
+    navItems: document.querySelectorAll(".nav-item"),
+    viewList: document.getElementById("view-list"),
+    viewKanban: document.getElementById("view-kanban"),
   };
 
   function escapeHtml(s) {
@@ -75,10 +80,11 @@
   // ---------- theme ----------
 
   function initTheme() {
+    // Claro é o padrão sempre — não segue a preferência do sistema. O usuário
+    // troca manualmente pelo menu, e aí sim a escolha fica salva.
     let saved = null;
     try { saved = localStorage.getItem("theme"); } catch (e) {}
-    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = saved || (prefersDark ? "dark" : "light");
+    const theme = saved === "dark" ? "dark" : "light";
     applyTheme(theme);
     els.btnTheme.addEventListener("click", () => {
       const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
@@ -164,7 +170,23 @@
 
   function render() {
     renderBanner();
-    renderList();
+    if (currentView === "kanban") {
+      renderKanban();
+    } else {
+      renderList();
+    }
+  }
+
+  function wireCardEvents(container) {
+    container.querySelectorAll(".deal-card").forEach((card) => {
+      card.addEventListener("click", (ev) => {
+        if (ev.target.closest(".ai-form") || ev.target.closest(".ai-log")) return;
+        card.classList.toggle("open");
+        if (card.classList.contains("open")) probeAiEndpoint(card);
+      });
+      const form = card.querySelector(".ai-form");
+      if (form) form.addEventListener("submit", (ev) => onAskAi(ev, card));
+    });
   }
 
   function renderBanner() {
@@ -185,19 +207,37 @@
     els.emptyState.hidden = total !== 0;
     els.loadMore.hidden = visibleCount >= main.length;
 
-    els.list.innerHTML = visible.map(cardHtml).join("");
-
-    els.list.querySelectorAll(".deal-card").forEach((card) => {
-      card.addEventListener("click", (ev) => {
-        if (ev.target.closest(".ai-form") || ev.target.closest(".ai-log")) return;
-        card.classList.toggle("open");
-        if (card.classList.contains("open")) probeAiEndpoint(card);
-      });
-      const form = card.querySelector(".ai-form");
-      if (form) form.addEventListener("submit", (ev) => onAskAi(ev, card));
-    });
-
+    els.list.innerHTML = visible.map((d) => cardHtml(d)).join("");
+    wireCardEvents(els.list);
     renderAttention(attention);
+  }
+
+  const KANBAN_STAGES = ["Prospecting", "Engaging"];
+  const KANBAN_COL_CAP = 40;
+
+  function renderKanban() {
+    const { main } = getFiltered();
+    els.resultCount.textContent = `${main.length} deal${main.length === 1 ? "" : "s"} encontrado${main.length === 1 ? "" : "s"}`;
+
+    els.viewKanban.innerHTML = KANBAN_STAGES.map((stage) => {
+      const deals = main.filter((d) => d.deal_stage === stage);
+      const visible = deals.slice(0, KANBAN_COL_CAP);
+      const rest = deals.length - visible.length;
+      const value = deals.reduce((s, d) => s + d.score.expected_value, 0);
+      return `
+        <div class="kanban-col" data-stage="${escapeHtml(stage)}">
+          <div class="kanban-col-head">
+            <span class="name">${escapeHtml(stage)}</span>
+            <span class="count">${deals.length} · ${compactCurrency(value)}</span>
+          </div>
+          <div class="kanban-col-body">
+            ${visible.map((d) => cardHtml(d, true)).join("")}
+            ${rest > 0 ? `<div class="kanban-more">+ ${rest.toLocaleString("pt-BR")} — ajuste os filtros pra ver todos</div>` : ""}
+          </div>
+        </div>`;
+    }).join("");
+
+    wireCardEvents(els.viewKanban);
   }
 
   function renderAttention(attention) {
@@ -229,11 +269,11 @@
     els.attentionSection.hidden = false;
   }
 
-  function cardHtml(d) {
+  function cardHtml(d, compact) {
     const tier = tierOf(d.score.priority_score);
     const account = d.account;
     return `
-    <li class="deal-card" data-id="${escapeHtml(d.opportunity_id)}">
+    <li class="deal-card${compact ? " kanban-card" : ""}" data-id="${escapeHtml(d.opportunity_id)}">
       <div class="deal-card-head">
         <div class="priority-badge tier-${tier}" style="background: var(--tier-${tier}-bg); color: var(--tier-${tier}-fg);" title="Prioridade ${tierLabel(tier)}">
           <div class="score">${d.score.priority_score}</div>
@@ -374,8 +414,33 @@
 
   // ---------- wiring ----------
 
+  function initSidebar() {
+    let collapsed = false;
+    try { collapsed = localStorage.getItem("sidebarCollapsed") === "1"; } catch (e) {}
+    els.drawer.classList.toggle("collapsed", collapsed);
+    els.btnCollapse.addEventListener("click", () => {
+      collapsed = !collapsed;
+      els.drawer.classList.toggle("collapsed", collapsed);
+      try { localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "0"); } catch (e) {}
+    });
+  }
+
+  function initViewSwitch() {
+    els.navItems.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        currentView = btn.dataset.view;
+        els.navItems.forEach((b) => b.classList.toggle("active", b === btn));
+        els.viewList.hidden = currentView !== "list";
+        els.viewKanban.hidden = currentView !== "kanban";
+        render();
+      });
+    });
+  }
+
   function init() {
     initTheme();
+    initSidebar();
+    initViewSwitch();
 
     els.btnMenu.addEventListener("click", () => {
       els.drawer.classList.remove("hidden");

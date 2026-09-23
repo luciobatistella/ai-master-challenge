@@ -341,7 +341,7 @@ a { color: inherit; }
 
   .filter-panel {
     position: fixed; bottom: auto;
-    width: 380px; border-radius: 14px; box-shadow: 0 12px 32px rgba(0,10,18,0.14);
+    width: 460px; border-radius: 14px; box-shadow: 0 12px 32px rgba(0,10,18,0.14);
     max-height: none;
   }
 

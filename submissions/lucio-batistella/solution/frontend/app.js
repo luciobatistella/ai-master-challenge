@@ -454,7 +454,7 @@
     els.filterPanel.style.right = "";
     if (!triggerBtn || !window.matchMedia(DESKTOP_QUERY).matches) return;
     const rect = triggerBtn.getBoundingClientRect();
-    const panelWidth = 380;
+    const panelWidth = 460;
     const left = Math.min(rect.left, window.innerWidth - panelWidth - 16);
     els.filterPanel.style.top = `${rect.bottom + 8}px`;
     els.filterPanel.style.left = `${Math.max(16, left)}px`;

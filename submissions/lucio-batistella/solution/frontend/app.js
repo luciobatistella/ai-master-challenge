@@ -34,6 +34,7 @@
     searchDesktop: document.getElementById("search-desktop"),
     searchMobile: document.getElementById("search-mobile"),
     chipRows: document.querySelectorAll(".chip-row"),
+    chipNoAccount: document.getElementById("chip-no-account"),
     selectManager: document.getElementById("select-manager"),
     selectAgent: document.getElementById("select-agent"),
     draftCount: document.getElementById("draft-count"),
@@ -171,7 +172,11 @@
   // ---------- filtering ----------
 
   function applyPredicate(d, f) {
-    if (f.stage !== "all" && d.deal_stage !== f.stage) return false;
+    if (f.stage === "Sem conta") {
+      if (d.account) return false;
+    } else if (f.stage !== "all" && d.deal_stage !== f.stage) {
+      return false;
+    }
     if (f.region !== "all" && d.regional_office !== f.region) return false;
     if (f.manager !== "all" && d.manager !== f.manager) return false;
     if (f.agent !== "all" && d.sales_agent !== f.agent) return false;
@@ -259,16 +264,12 @@
     const { main } = getFiltered();
     const total = main.length;
     const visible = main.slice(0, visibleCount);
-    const noAccountTotal = main.filter((d) => !d.account).length;
-    const boundaryIndex = visible.findIndex((d) => !d.account);
 
     setResultCount(`${total} deal${total === 1 ? "" : "s"} encontrado${total === 1 ? "" : "s"}`);
     els.emptyState.hidden = total !== 0;
     els.loadMore.hidden = visibleCount >= main.length;
 
-    els.list.innerHTML = visible
-      .map((d, i) => (i === boundaryIndex ? `<li class="list-section-heading">Sem conta (${noAccountTotal})</li>` : "") + cardHtml(d))
-      .join("");
+    els.list.innerHTML = visible.map((d) => cardHtml(d)).join("");
     wireCardEvents(els.list);
   }
 
@@ -504,6 +505,13 @@
     els.navItems.forEach((b) => b.classList.toggle("active", b.dataset.view === view));
     els.viewList.hidden = view !== "list";
     els.viewKanban.hidden = view !== "kanban";
+    // "Sem conta" no filtro de estágio só faz sentido na lista — o kanban já
+    // tem a própria coluna dedicada pra isso.
+    els.chipNoAccount.hidden = view !== "list";
+    if (view !== "list" && state.stage === "Sem conta") {
+      state.stage = "all";
+      paintFilterDot();
+    }
     render();
   }
 

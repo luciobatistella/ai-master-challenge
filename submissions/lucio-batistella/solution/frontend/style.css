@@ -178,12 +178,6 @@ a { color: inherit; }
 
 .deal-card.no-account { border-style: dashed; }
 .tag-no-account { color: var(--ink-muted); font-weight: 700; }
-.list-section-heading {
-  grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--ink-2);
-  padding: 14px 2px 2px; margin-top: 4px; border-top: 1px dashed var(--hairline);
-}
-.list-section-heading:first-child { border-top: none; margin-top: 0; padding-top: 0; }
-
 .deal-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline); display: none; }
 .deal-card.open .deal-detail { display: block; }
 .narrative { font-size: 13px; color: var(--ink); line-height: 1.5; margin: 0 0 10px; }

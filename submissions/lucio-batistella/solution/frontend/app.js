@@ -189,12 +189,13 @@
 
   // Deals sem conta identificada continuam aparecendo no estágio real deles
   // (mesmo produto/agente/valor, só falta a conta) — mas não é possível
-  // calcular uma prioridade comparável pra eles. Ficam agrupados no topo da
-  // lista (precisam de ação no CRM primeiro), sem posição no ranking.
+  // calcular uma prioridade comparável pra eles. Ficam ao final da lista
+  // (sem posição no ranking); pra isolar e agir em lote, use o filtro
+  // "Sem conta" no Estágio.
   function sortForDisplay(deals) {
     const withAccount = deals.filter((d) => d.account).sort((a, b) => b.score.priority_score - a.score.priority_score);
     const withoutAccount = deals.filter((d) => !d.account).sort((a, b) => b.score.estimated_value - a.score.estimated_value);
-    return [...withoutAccount, ...withAccount];
+    return [...withAccount, ...withoutAccount];
   }
 
   function getFiltered() {

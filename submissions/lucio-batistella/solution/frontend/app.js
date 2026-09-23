@@ -63,6 +63,10 @@
     navItems: document.querySelectorAll(".nav-item"),
     viewList: document.getElementById("view-list"),
     viewKanban: document.getElementById("view-kanban"),
+    viewDashboard: document.getElementById("view-dashboard"),
+    meterFill: document.getElementById("meter-no-account-fill"),
+    meterValue: document.getElementById("meter-no-account-value"),
+    meterSub: document.getElementById("meter-no-account-sub"),
   };
 
   function escapeHtml(s) {
@@ -107,6 +111,9 @@
     els.themeIcon.innerHTML = theme === "dark" ? ICON_MOON : ICON_SUN;
     els.themeLabel.textContent = theme === "dark" ? "Modo escuro" : "Modo claro";
     els.themeOptions.forEach((btn) => btn.classList.toggle("active", btn.dataset.themeChoice === theme));
+    // Cores dos gráficos são lidas das CSS vars no momento da criação/update —
+    // não seguem a troca de tema automaticamente, então força um refresh.
+    if (currentView === "dashboard") renderDashboard();
   }
 
   // ---------- profile dropdown ----------
@@ -213,6 +220,8 @@
     renderBanner();
     if (currentView === "kanban") {
       renderKanban();
+    } else if (currentView === "dashboard") {
+      renderDashboard();
     } else {
       renderList();
     }
@@ -322,6 +331,186 @@
     const top = els.viewKanban.getBoundingClientRect().top;
     const height = Math.max(240, window.innerHeight - top - 20);
     els.viewKanban.style.height = `${height}px`;
+  }
+
+  // ---------- dashboard ----------
+
+  const charts = {};
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function hexToRgba(hex, alpha) {
+    const h = hex.replace("#", "");
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function groupSum(deals, keyFn) {
+    const map = new Map();
+    deals.forEach((d) => {
+      const k = keyFn(d);
+      const cur = map.get(k) || { count: 0, value: 0 };
+      cur.count += 1;
+      cur.value += d.score.expected_value;
+      map.set(k, cur);
+    });
+    return map;
+  }
+
+  function baseChartOptions(extra) {
+    const grid = cssVar("--chart-grid");
+    const axis = cssVar("--chart-axis");
+    const opts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500, easing: "easeOutQuart" },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: cssVar("--surface"), titleColor: cssVar("--ink"), bodyColor: cssVar("--ink"),
+          borderColor: cssVar("--hairline"), borderWidth: 1, padding: 10, cornerRadius: 8, boxPadding: 4,
+        },
+      },
+      scales: {
+        x: { grid: { color: grid }, ticks: { color: axis, font: { size: 11 } }, border: { display: false } },
+        y: { grid: { color: grid }, ticks: { color: axis, font: { size: 11 } }, border: { display: false }, beginAtZero: true },
+      },
+    };
+    if (extra && extra.plugins) Object.assign(opts.plugins, extra.plugins);
+    if (extra && extra.scales) {
+      Object.keys(extra.scales).forEach((k) => Object.assign(opts.scales[k] || (opts.scales[k] = {}), extra.scales[k]));
+    }
+    if (extra) {
+      Object.keys(extra).forEach((k) => { if (k !== "plugins" && k !== "scales") opts[k] = extra[k]; });
+    }
+    return opts;
+  }
+
+  function upsertChart(id, canvasId, config) {
+    if (charts[id]) {
+      charts[id].data = config.data;
+      charts[id].options = config.options;
+      charts[id].update();
+      return;
+    }
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || typeof Chart === "undefined") return;
+    charts[id] = new Chart(canvas, config);
+  }
+
+  function renderLegend(containerId, items) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = "";
+    items.forEach((it) => {
+      const row = document.createElement("div");
+      row.className = "dash-legend-row";
+      const dot = document.createElement("span");
+      dot.className = "dash-legend-dot";
+      dot.style.background = it.color;
+      const label = document.createElement("span");
+      label.className = "dash-legend-label";
+      label.textContent = it.label;
+      const sub = document.createElement("span");
+      sub.className = "dash-legend-sub";
+      sub.textContent = it.sub;
+      row.append(dot, label, sub);
+      el.appendChild(row);
+    });
+  }
+
+  function renderMeter(matches, noAccount) {
+    const pct = matches.length ? Math.round((noAccount.length / matches.length) * 100) : 0;
+    const sumEst = noAccount.reduce((s, d) => s + d.score.estimated_value, 0);
+    els.meterFill.style.width = pct + "%";
+    els.meterValue.textContent = pct + "%";
+    els.meterSub.textContent =
+      `${noAccount.length.toLocaleString("pt-BR")} de ${matches.length.toLocaleString("pt-BR")} deals abertos · ${compactCurrency(sumEst)} em estimativa`;
+  }
+
+  function renderStageChart(withAccount) {
+    const stages = ["Prospecting", "Engaging"];
+    const colors = [cssVar("--chart-1"), cssVar("--chart-2")];
+    const counts = stages.map((s) => withAccount.filter((d) => d.deal_stage === s).length);
+    const values = stages.map((s) => withAccount.filter((d) => d.deal_stage === s).reduce((s2, d) => s2 + d.score.expected_value, 0));
+    upsertChart("stage", "chart-stage", {
+      type: "bar",
+      data: { labels: stages, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
+      options: baseChartOptions({
+        plugins: { tooltip: { callbacks: {
+          title: (items) => stages[items[0].dataIndex],
+          label: (item) => [compactCurrency(item.parsed.y), `${counts[item.dataIndex]} deals`],
+        } } },
+        scales: { y: { ticks: { callback: (v) => compactCurrency(v) } } },
+      }),
+    });
+    renderLegend("legend-stage", stages.map((s, i) => ({ label: s, color: colors[i], sub: `${counts[i]} deals · ${compactCurrency(values[i])}` })));
+  }
+
+  function renderPriorityChart(withAccount) {
+    const buckets = [];
+    for (let i = 0; i < 10; i++) buckets.push({ lo: i * 10, hi: i === 9 ? 100 : i * 10 + 9, label: i === 9 ? "90–100" : `${i * 10}–${i * 10 + 9}` });
+    const counts = buckets.map((b) => withAccount.filter((d) => d.score.priority_score >= b.lo && d.score.priority_score <= b.hi).length);
+    const base = cssVar("--chart-1");
+    const colors = counts.map((_, i) => hexToRgba(base, 0.25 + (i / 9) * 0.75));
+    upsertChart("priority", "chart-priority", {
+      type: "bar",
+      data: { labels: buckets.map((b) => b.label), datasets: [{ data: counts, backgroundColor: colors, borderRadius: 4 }] },
+      options: baseChartOptions({
+        plugins: { tooltip: { callbacks: { title: (items) => `Score ${buckets[items[0].dataIndex].label}`, label: (item) => `${item.parsed.y} deals` } } },
+      }),
+    });
+  }
+
+  function renderManagerChart(withAccount) {
+    const byManager = groupSum(withAccount, (d) => d.manager || "—");
+    const rows = Array.from(byManager.entries())
+      .map(([manager, v]) => ({ manager, value: v.value, count: v.count }))
+      .sort((a, b) => b.value - a.value);
+    upsertChart("manager", "chart-manager", {
+      type: "bar",
+      data: { labels: rows.map((r) => r.manager), datasets: [{ data: rows.map((r) => r.value), backgroundColor: cssVar("--chart-1"), borderRadius: 4, maxBarThickness: 20 }] },
+      options: baseChartOptions({
+        indexAxis: "y",
+        plugins: { tooltip: { callbacks: { label: (item) => [compactCurrency(item.parsed.x), `${rows[item.dataIndex].count} deals`] } } },
+        scales: { x: { ticks: { callback: (v) => compactCurrency(v) } }, y: { grid: { display: false } } },
+      }),
+    });
+  }
+
+  function renderRegionChart(withAccount) {
+    const regions = ["Central", "East", "West"];
+    const colors = [cssVar("--chart-3"), cssVar("--chart-4"), cssVar("--chart-5")];
+    const counts = regions.map((r) => withAccount.filter((d) => d.regional_office === r).length);
+    const values = regions.map((r) => withAccount.filter((d) => d.regional_office === r).reduce((s, d) => s + d.score.expected_value, 0));
+    upsertChart("region", "chart-region", {
+      type: "bar",
+      data: { labels: regions, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
+      options: baseChartOptions({
+        plugins: { tooltip: { callbacks: {
+          title: (items) => regions[items[0].dataIndex],
+          label: (item) => [compactCurrency(item.parsed.y), `${counts[item.dataIndex]} deals`],
+        } } },
+        scales: { y: { ticks: { callback: (v) => compactCurrency(v) } } },
+      }),
+    });
+    renderLegend("legend-region", regions.map((r, i) => ({ label: r, color: colors[i], sub: `${counts[i]} deals · ${compactCurrency(values[i])}` })));
+  }
+
+  function renderDashboard() {
+    const matches = ALL_DEALS.filter((d) => applyPredicate(d, state));
+    const withAccount = matches.filter((d) => d.account);
+    const noAccount = matches.filter((d) => !d.account);
+    setResultCount(`${matches.length} deal${matches.length === 1 ? "" : "s"} encontrado${matches.length === 1 ? "" : "s"}`);
+    renderMeter(matches, noAccount);
+    renderStageChart(withAccount);
+    renderPriorityChart(withAccount);
+    renderManagerChart(withAccount);
+    renderRegionChart(withAccount);
   }
 
   function cardHtml(d, compact) {
@@ -506,6 +695,7 @@
     els.navItems.forEach((b) => b.classList.toggle("active", b.dataset.view === view));
     els.viewList.hidden = view !== "list";
     els.viewKanban.hidden = view !== "kanban";
+    els.viewDashboard.hidden = view !== "dashboard";
     // "Sem conta" no filtro de estágio só faz sentido na lista — o kanban já
     // tem a própria coluna dedicada pra isso.
     els.chipNoAccount.hidden = view !== "list";
@@ -518,7 +708,11 @@
 
   function initViewSwitch() {
     els.navItems.forEach((btn) => {
-      btn.addEventListener("click", () => setView(btn.dataset.view));
+      btn.addEventListener("click", () => {
+        setView(btn.dataset.view);
+        els.drawer.classList.add("hidden");
+        els.overlay.hidden = true;
+      });
     });
     // Kanban só existe no desktop — se a janela encolher pra mobile enquanto
     // o kanban está ativo, volta pra lista.

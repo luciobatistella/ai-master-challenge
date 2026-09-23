@@ -159,7 +159,11 @@ a { color: inherit; }
   white-space: nowrap;
 }
 .deal-list { list-style: none; margin: 0; padding: 10px 20px 8px; display: flex; flex-direction: column; gap: 10px; }
-.deal-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 14px; cursor: pointer; }
+.deal-card {
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 14px; cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.deal-card:hover { border-color: var(--ink-muted); box-shadow: 0 4px 14px rgba(0,10,18,0.1); }
 .deal-card-head { display: flex; align-items: flex-start; gap: 12px; }
 .priority-badge {
   flex: none; width: 52px; height: 52px; border-radius: 12px; border: 1px solid var(--border);

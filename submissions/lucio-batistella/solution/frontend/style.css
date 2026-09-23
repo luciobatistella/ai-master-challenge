@@ -225,10 +225,10 @@ a { color: inherit; }
 .filter-group-label { font-size: 12px; font-weight: 600; color: var(--ink-muted); margin-bottom: 8px; }
 .chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
 .chip {
-  padding: 7px 12px; font-size: 13px; font-weight: 600; border-radius: 8px; border: none;
+  padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid var(--hairline);
   background: transparent; color: var(--ink-2);
 }
-.chip.on { background: var(--primary-bg); color: var(--primary-fg); }
+.chip.on { background: var(--primary-bg); color: var(--primary-fg); border-color: var(--primary-bg); }
 .filter-panel select {
   width: 100%; box-sizing: border-box; padding: 9px 10px; font-size: 13px;
   border: 1px solid var(--hairline); border-radius: 8px; background: var(--page); color: var(--ink);

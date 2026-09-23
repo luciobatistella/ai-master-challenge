@@ -24,7 +24,9 @@
   const els = {
     btnMenu: document.getElementById("btn-menu"),
     btnFilter: document.getElementById("btn-filter"),
+    btnFilterDesktop: document.getElementById("btn-filter-desktop"),
     filterDot: document.getElementById("filter-dot"),
+    filterDotDesktop: document.getElementById("filter-dot-desktop"),
     filterPanel: document.getElementById("filter-panel"),
     searchDesktop: document.getElementById("search-desktop"),
     searchMobile: document.getElementById("search-mobile"),
@@ -38,7 +40,9 @@
     overlay: document.getElementById("overlay"),
     drawer: document.getElementById("drawer"),
     btnTheme: document.getElementById("btn-theme"),
+    btnThemeDesktop: document.getElementById("btn-theme-desktop"),
     themeIcon: document.getElementById("theme-icon"),
+    themeIconDesktop: document.getElementById("theme-icon-desktop"),
     themeLabel: document.getElementById("theme-label"),
     banner: document.getElementById("banner"),
     bannerCount: document.getElementById("banner-count"),
@@ -50,7 +54,6 @@
     emptyState: document.getElementById("empty-state"),
     asOf: document.getElementById("data-asof"),
     attentionSection: document.getElementById("attention-section"),
-    btnCollapse: document.getElementById("btn-collapse"),
     navItems: document.querySelectorAll(".nav-item"),
     viewList: document.getElementById("view-list"),
     viewKanban: document.getElementById("view-kanban"),
@@ -86,16 +89,20 @@
     try { saved = localStorage.getItem("theme"); } catch (e) {}
     const theme = saved === "dark" ? "dark" : "light";
     applyTheme(theme);
-    els.btnTheme.addEventListener("click", () => {
+    const toggle = () => {
       const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
       applyTheme(next);
       try { localStorage.setItem("theme", next); } catch (e) {}
-    });
+    };
+    els.btnTheme.addEventListener("click", toggle);
+    els.btnThemeDesktop.addEventListener("click", toggle);
   }
 
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
-    els.themeIcon.innerHTML = theme === "dark" ? ICON_MOON : ICON_SUN;
+    const icon = theme === "dark" ? ICON_MOON : ICON_SUN;
+    els.themeIcon.innerHTML = icon;
+    els.themeIconDesktop.innerHTML = icon;
     els.themeLabel.textContent = theme === "dark" ? "Modo escuro" : "Modo claro";
   }
 
@@ -410,20 +417,10 @@
   function paintFilterDot() {
     const active = state.stage !== "all" || state.region !== "all" || state.manager !== "all" || state.agent !== "all";
     els.filterDot.hidden = !active;
+    els.filterDotDesktop.hidden = !active;
   }
 
   // ---------- wiring ----------
-
-  function initSidebar() {
-    let collapsed = false;
-    try { collapsed = localStorage.getItem("sidebarCollapsed") === "1"; } catch (e) {}
-    els.drawer.classList.toggle("collapsed", collapsed);
-    els.btnCollapse.addEventListener("click", () => {
-      collapsed = !collapsed;
-      els.drawer.classList.toggle("collapsed", collapsed);
-      try { localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "0"); } catch (e) {}
-    });
-  }
 
   function initViewSwitch() {
     els.navItems.forEach((btn) => {
@@ -439,7 +436,6 @@
 
   function init() {
     initTheme();
-    initSidebar();
     initViewSwitch();
 
     els.btnMenu.addEventListener("click", () => {
@@ -452,6 +448,7 @@
     });
 
     els.btnFilter.addEventListener("click", openFilterPanel);
+    els.btnFilterDesktop.addEventListener("click", openFilterPanel);
     els.btnCancel.addEventListener("click", closeFilterPanel);
     els.btnApply.addEventListener("click", () => {
       state.stage = draft.stage;

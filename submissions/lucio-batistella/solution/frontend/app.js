@@ -559,6 +559,28 @@
     });
   }
 
+  function renderAgentChart() {
+    const pool = ALL_DEALS.filter((d) => applyPredicate(d, state, "agent")).filter((d) => d.account);
+    const byAgent = groupSum(pool, (d) => d.sales_agent || "—");
+    const rows = Array.from(byAgent.entries())
+      .map(([agent, v]) => ({ agent, value: v.value, count: v.count }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+    const base = cssVar("--chart-1");
+    const colors = rows.map((r) => (state.agent === "all" || state.agent === r.agent ? base : hexToRgba(base, 0.25)));
+    upsertChart("agent", "chart-agent", {
+      type: "bar",
+      data: { labels: rows.map((r) => r.agent), datasets: [{ data: rows.map((r) => r.value), backgroundColor: colors, borderRadius: 4, maxBarThickness: 20 }] },
+      options: baseChartOptions({
+        indexAxis: "y",
+        onClick: barClickHandler("agent", (i) => rows[i].agent),
+        onHover: barHoverHandler,
+        plugins: { tooltip: { callbacks: { label: (item) => [compactCurrency(item.parsed.x), `${rows[item.dataIndex].count} deals`] } } },
+        scales: { x: { ticks: { callback: (v) => compactCurrency(v) } }, y: { grid: { display: false } } },
+      }),
+    });
+  }
+
   function renderRegionChart() {
     const pool = ALL_DEALS.filter((d) => applyPredicate(d, state, "region")).filter((d) => d.account);
     const regions = ["Central", "East", "West"];
@@ -588,6 +610,7 @@
     renderStageChart();
     renderPriorityChart();
     renderManagerChart();
+    renderAgentChart();
     renderRegionChart();
   }
 

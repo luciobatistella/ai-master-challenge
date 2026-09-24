@@ -129,6 +129,7 @@
         <div class="toolbar-card">
           <div class="search-wrap">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <div id="active-filters" class="active-filters" hidden></div>
             <input id="search-desktop" type="search" placeholder="Buscar conta ou produto" aria-label="Buscar">
           </div>
           <div class="toolbar-divider"></div>
@@ -158,8 +159,6 @@
         </div>
       </div>
 
-      <div id="active-filters" class="active-filters" hidden></div>
-
       <p id="result-count" class="result-count" aria-live="polite"></p>
 
       <div id="view-list">
@@ -186,6 +185,11 @@
             <div class="dash-card-title">Valor esperado por manager</div>
             <div class="dash-chart-wrap"><canvas id="chart-manager" role="img" aria-label="Ranking de managers por valor esperado"></canvas></div>
             <p class="dash-card-hint">Clique num manager pra filtrar</p>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">Valor esperado por vendedor (top 10)</div>
+            <div class="dash-chart-wrap"><canvas id="chart-agent" role="img" aria-label="Ranking de vendedores por valor esperado"></canvas></div>
+            <p class="dash-card-hint">Clique num vendedor pra filtrar</p>
           </div>
           <div class="dash-card">
             <div class="dash-card-title">Deals por região</div>

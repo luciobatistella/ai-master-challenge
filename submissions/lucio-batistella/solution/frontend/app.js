@@ -489,6 +489,20 @@
     return categories.map((cat, i) => (cat === activeValue ? baseColors[i] : hexToRgba(baseColors[i], 0.25)));
   }
 
+  // Mesma cor que a barra clicada usa no gráfico, pra ligar visualmente o
+  // badge de filtro ativo à barra que ele representa.
+  function filterBadgeColor(field, value) {
+    if (field === "stage") {
+      const i = ["Prospecting", "Engaging", "Sem conta"].indexOf(value);
+      return [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--ink-muted")][i] ?? cssVar("--chart-1");
+    }
+    if (field === "region") {
+      const i = ["Central", "East", "West"].indexOf(value);
+      return [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--chart-3")][i] ?? cssVar("--chart-1");
+    }
+    return cssVar("--chart-1");
+  }
+
   function renderStageChart() {
     const stages = ["Prospecting", "Engaging", "Sem conta"];
     const baseColors = [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--ink-muted")];
@@ -800,6 +814,12 @@
     active.forEach((key) => {
       const chip = document.createElement("span");
       chip.className = "active-filter-chip";
+      const color = filterBadgeColor(key, state[key]);
+      chip.style.background = hexToRgba(color, 0.14);
+      chip.style.borderColor = hexToRgba(color, 0.45);
+      const dot = document.createElement("span");
+      dot.className = "active-filter-dot";
+      dot.style.background = color;
       const label = document.createElement("span");
       label.textContent = `${FILTER_LABELS[key]}: ${state[key]}`;
       const btn = document.createElement("button");
@@ -813,7 +833,7 @@
         paintActiveFilters();
         render();
       });
-      chip.append(label, btn);
+      chip.append(dot, label, btn);
       els.activeFilters.appendChild(chip);
     });
   }

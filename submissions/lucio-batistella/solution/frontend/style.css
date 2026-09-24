@@ -162,13 +162,14 @@ a { color: inherit; }
 
 /* Badges de filtro ativo — vivem dentro da própria busca, como se já
    tivessem sido "digitados" ali; a lista rola horizontalmente se lotar. */
-.active-filters { display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.active-filters { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .active-filters::-webkit-scrollbar { display: none; }
 .active-filter-chip {
-  display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px; flex: none; white-space: nowrap;
   background: var(--surface); border: 1px solid var(--hairline); border-radius: 999px;
   padding: 3px 3px 3px 8px; font-size: 11px; font-weight: 600; color: var(--ink-2);
 }
+.active-filter-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; }
 .active-filter-chip button {
   display: flex; align-items: center; justify-content: center; flex: none;
   width: 14px; height: 14px; border-radius: 50%; border: none;
@@ -358,12 +359,11 @@ a { color: inherit; }
   .page-content { max-width: 1200px; margin: 0 auto; padding: 0 40px; }
 
   .page-toolbar { display: flex; align-items: center; gap: 10px; padding: 18px 0 0; }
-  .search-wrap { display: flex; width: 240px; }
+  .search-wrap { display: flex; width: 340px; }
 
   .deal-list { padding: 20px 0 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .result-count { display: none; }
   .result-badge { display: inline-flex; align-items: center; }
-  .active-filters { padding: 0 0 10px; }
   .banner { left: auto; right: 24px; bottom: 24px; max-width: 360px; }
   .load-more { width: 100%; margin: 4px 0 0; }
 
@@ -404,6 +404,10 @@ a { color: inherit; }
   background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px;
   padding: 16px; min-width: 0; break-inside: avoid; margin: 0 0 16px;
 }
+/* Manager e Vendedor sempre um abaixo do outro, como uma unidade só no
+   masonry — sem isso, a coluna balanceia por altura e pode separar os dois. */
+.dash-pair { display: flex; flex-direction: column; gap: 16px; break-inside: avoid; margin: 0 0 16px; }
+.dash-pair .dash-card { margin: 0; }
 .dash-card-title { font-size: 13px; font-weight: 700; color: var(--ink-2); margin: 0 0 12px; }
 .dash-chart-wrap { position: relative; height: 220px; }
 .dash-chart-wrap canvas { max-width: 100%; }

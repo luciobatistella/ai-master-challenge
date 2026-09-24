@@ -20,9 +20,9 @@
     agent: "all",
   };
   const draft = { stage: "all", region: "all", manager: "all", agent: "all" };
-  // Kanban é o padrão no desktop; no mobile ele não existe, então sempre
-  // começa na lista ali, independente do padrão desktop.
-  let currentView = window.matchMedia(DESKTOP_QUERY).matches ? "kanban" : "list"; // "list" | "kanban"
+  // Dashboard é o padrão nos dois breakpoints — Kanban continua exclusivo
+  // do desktop (ver initViewSwitch/o guard de resize).
+  let currentView = "dashboard"; // "list" | "kanban" | "dashboard"
 
   const els = {
     btnMenu: document.getElementById("btn-menu"),
@@ -67,6 +67,7 @@
     meterFill: document.getElementById("meter-no-account-fill"),
     meterValue: document.getElementById("meter-no-account-value"),
     meterSub: document.getElementById("meter-no-account-sub"),
+    dashCardMeter: document.getElementById("dash-card-meter"),
   };
 
   function escapeHtml(s) {
@@ -423,6 +424,26 @@
     });
   }
 
+  // Clicar num gráfico do dashboard aplica o filtro correspondente e leva
+  // pra visão certa pra ver os deals de verdade, em vez de só olhar o número.
+  function filterAndGoTo(view, patch) {
+    Object.assign(state, patch);
+    visibleCount = PAGE_SIZE;
+    paintFilterDot();
+    setView(view);
+  }
+
+  function barClickHandler(getPatch, view) {
+    return (evt, elements) => {
+      if (!elements.length) return;
+      filterAndGoTo(view, getPatch(elements[0].index));
+    };
+  }
+
+  function barHoverHandler(evt, elements) {
+    evt.native.target.style.cursor = elements.length ? "pointer" : "default";
+  }
+
   function renderMeter(matches, noAccount) {
     const pct = matches.length ? Math.round((noAccount.length / matches.length) * 100) : 0;
     const sumEst = noAccount.reduce((s, d) => s + d.score.estimated_value, 0);
@@ -441,6 +462,8 @@
       type: "bar",
       data: { labels: stages, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
       options: baseChartOptions({
+        onClick: barClickHandler((i) => ({ stage: stages[i] }), "kanban"),
+        onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: {
           title: (items) => stages[items[0].dataIndex],
           label: (item) => [compactCurrency(item.parsed.y), `${counts[item.dataIndex]} deals`],
@@ -476,6 +499,8 @@
       data: { labels: rows.map((r) => r.manager), datasets: [{ data: rows.map((r) => r.value), backgroundColor: cssVar("--chart-1"), borderRadius: 4, maxBarThickness: 20 }] },
       options: baseChartOptions({
         indexAxis: "y",
+        onClick: barClickHandler((i) => ({ manager: rows[i].manager }), "list"),
+        onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: { label: (item) => [compactCurrency(item.parsed.x), `${rows[item.dataIndex].count} deals`] } } },
         scales: { x: { ticks: { callback: (v) => compactCurrency(v) } }, y: { grid: { display: false } } },
       }),
@@ -484,13 +509,15 @@
 
   function renderRegionChart(withAccount) {
     const regions = ["Central", "East", "West"];
-    const colors = [cssVar("--chart-3"), cssVar("--chart-4"), cssVar("--chart-5")];
+    const colors = [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--chart-3")];
     const counts = regions.map((r) => withAccount.filter((d) => d.regional_office === r).length);
     const values = regions.map((r) => withAccount.filter((d) => d.regional_office === r).reduce((s, d) => s + d.score.expected_value, 0));
     upsertChart("region", "chart-region", {
       type: "bar",
       data: { labels: regions, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
       options: baseChartOptions({
+        onClick: barClickHandler((i) => ({ region: regions[i] }), "list"),
+        onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: {
           title: (items) => regions[items[0].dataIndex],
           label: (item) => [compactCurrency(item.parsed.y), `${counts[item.dataIndex]} deals`],
@@ -728,6 +755,7 @@
     initViewSwitch();
     setView(currentView);
     window.addEventListener("resize", sizeKanbanBoard);
+    els.dashCardMeter.addEventListener("click", () => filterAndGoTo("list", { stage: "Sem conta" }));
 
     els.btnMenu.addEventListener("click", () => {
       els.drawer.classList.remove("hidden");

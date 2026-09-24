@@ -424,19 +424,20 @@
     });
   }
 
-  // Clicar num gráfico do dashboard aplica o filtro correspondente e leva
-  // pra visão certa pra ver os deals de verdade, em vez de só olhar o número.
-  function filterAndGoTo(view, patch) {
+  // Clicar num gráfico do dashboard aplica o filtro correspondente e refaz
+  // os gráficos na hora — cross-filtering, sem sair da view. O filtro fica
+  // valendo se o usuário for pra Lista/Kanban depois.
+  function filterInPlace(patch) {
     Object.assign(state, patch);
     visibleCount = PAGE_SIZE;
     paintFilterDot();
-    setView(view);
+    renderDashboard();
   }
 
-  function barClickHandler(getPatch, view) {
+  function barClickHandler(getPatch) {
     return (evt, elements) => {
       if (!elements.length) return;
-      filterAndGoTo(view, getPatch(elements[0].index));
+      filterInPlace(getPatch(elements[0].index));
     };
   }
 
@@ -453,16 +454,24 @@
       `${noAccount.length.toLocaleString("pt-BR")} de ${matches.length.toLocaleString("pt-BR")} deals abertos · ${compactCurrency(sumEst)} em estimativa`;
   }
 
-  function renderStageChart(withAccount) {
-    const stages = ["Prospecting", "Engaging"];
-    const colors = [cssVar("--chart-1"), cssVar("--chart-2")];
-    const counts = stages.map((s) => withAccount.filter((d) => d.deal_stage === s).length);
-    const values = stages.map((s) => withAccount.filter((d) => d.deal_stage === s).reduce((s2, d) => s2 + d.score.expected_value, 0));
+  function renderStageChart(withAccount, noAccount) {
+    const stages = ["Prospecting", "Engaging", "Sem conta"];
+    const colors = [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--ink-muted")];
+    const counts = [
+      withAccount.filter((d) => d.deal_stage === "Prospecting").length,
+      withAccount.filter((d) => d.deal_stage === "Engaging").length,
+      noAccount.length,
+    ];
+    const values = [
+      withAccount.filter((d) => d.deal_stage === "Prospecting").reduce((s, d) => s + d.score.expected_value, 0),
+      withAccount.filter((d) => d.deal_stage === "Engaging").reduce((s, d) => s + d.score.expected_value, 0),
+      noAccount.reduce((s, d) => s + d.score.estimated_value, 0),
+    ];
     upsertChart("stage", "chart-stage", {
       type: "bar",
       data: { labels: stages, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
       options: baseChartOptions({
-        onClick: barClickHandler((i) => ({ stage: stages[i] }), "kanban"),
+        onClick: barClickHandler((i) => ({ stage: stages[i] })),
         onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: {
           title: (items) => stages[items[0].dataIndex],
@@ -499,7 +508,7 @@
       data: { labels: rows.map((r) => r.manager), datasets: [{ data: rows.map((r) => r.value), backgroundColor: cssVar("--chart-1"), borderRadius: 4, maxBarThickness: 20 }] },
       options: baseChartOptions({
         indexAxis: "y",
-        onClick: barClickHandler((i) => ({ manager: rows[i].manager }), "list"),
+        onClick: barClickHandler((i) => ({ manager: rows[i].manager })),
         onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: { label: (item) => [compactCurrency(item.parsed.x), `${rows[item.dataIndex].count} deals`] } } },
         scales: { x: { ticks: { callback: (v) => compactCurrency(v) } }, y: { grid: { display: false } } },
@@ -516,7 +525,7 @@
       type: "bar",
       data: { labels: regions, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
       options: baseChartOptions({
-        onClick: barClickHandler((i) => ({ region: regions[i] }), "list"),
+        onClick: barClickHandler((i) => ({ region: regions[i] })),
         onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: {
           title: (items) => regions[items[0].dataIndex],
@@ -534,7 +543,7 @@
     const noAccount = matches.filter((d) => !d.account);
     setResultCount(`${matches.length} deal${matches.length === 1 ? "" : "s"} encontrado${matches.length === 1 ? "" : "s"}`);
     renderMeter(matches, noAccount);
-    renderStageChart(withAccount);
+    renderStageChart(withAccount, noAccount);
     renderPriorityChart(withAccount);
     renderManagerChart(withAccount);
     renderRegionChart(withAccount);
@@ -755,7 +764,7 @@
     initViewSwitch();
     setView(currentView);
     window.addEventListener("resize", sizeKanbanBoard);
-    els.dashCardMeter.addEventListener("click", () => filterAndGoTo("list", { stage: "Sem conta" }));
+    els.dashCardMeter.addEventListener("click", () => filterInPlace({ stage: "Sem conta" }));
 
     els.btnMenu.addEventListener("click", () => {
       els.drawer.classList.remove("hidden");

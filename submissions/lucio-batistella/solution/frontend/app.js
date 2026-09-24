@@ -64,10 +64,7 @@
     viewList: document.getElementById("view-list"),
     viewKanban: document.getElementById("view-kanban"),
     viewDashboard: document.getElementById("view-dashboard"),
-    meterFill: document.getElementById("meter-no-account-fill"),
-    meterValue: document.getElementById("meter-no-account-value"),
-    meterSub: document.getElementById("meter-no-account-sub"),
-    dashCardMeter: document.getElementById("dash-card-meter"),
+    activeFilters: document.getElementById("active-filters"),
   };
 
   function escapeHtml(s) {
@@ -163,31 +160,66 @@
 
     const regionRow = document.querySelector('.chip-row[data-group="region"]');
     regionRow.innerHTML =
-      chipHtml("region", "all", "Todas") + regions.map((r) => chipHtml("region", r, r)).join("");
+      chipHtml("region", "all", "Todas", ALL_DEALS.length) +
+      regions.map((r) => chipHtml("region", r, r, ALL_DEALS.filter((d) => d.regional_office === r).length)).join("");
 
-    fillSelect(els.selectManager, [{ value: "all", label: "Todos os managers" }, ...managers.map((m) => ({ value: m, label: m }))]);
-    fillSelect(els.selectAgent, [{ value: "all", label: "Todos os vendedores" }, ...agents.map((a) => ({ value: a, label: a }))]);
+    fillSelect(els.selectManager, [
+      { value: "all", label: "Todos os managers", count: ALL_DEALS.length },
+      ...managers.map((m) => ({ value: m, label: m, count: ALL_DEALS.filter((d) => d.manager === m).length })),
+    ]);
+    fillSelect(els.selectAgent, [
+      { value: "all", label: "Todos os vendedores", count: ALL_DEALS.length },
+      ...agents.map((a) => ({ value: a, label: a, count: ALL_DEALS.filter((d) => d.sales_agent === a).length })),
+    ]);
+
+    paintStageChipCounts();
   }
 
-  function chipHtml(group, value, label) {
-    return `<button class="chip" data-group="${group}" data-value="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
+  // Os chips de Estágio já existem fixos no HTML (por causa do "Sem conta"
+  // com visibilidade condicional por view) — só injeta a contagem uma vez,
+  // sem precisar regenerar o botão.
+  function paintStageChipCounts() {
+    const counts = {
+      all: ALL_DEALS.length,
+      Engaging: ALL_DEALS.filter((d) => d.deal_stage === "Engaging").length,
+      Prospecting: ALL_DEALS.filter((d) => d.deal_stage === "Prospecting").length,
+      "Sem conta": ALL_DEALS.filter((d) => !d.account).length,
+    };
+    document.querySelectorAll('.chip-row[data-group="stage"] .chip').forEach((btn) => {
+      const value = btn.dataset.value;
+      const label = btn.textContent.trim();
+      btn.innerHTML = `${escapeHtml(label)} <span class="chip-count">(${counts[value] ?? 0})</span>`;
+    });
+  }
+
+  function chipHtml(group, value, label, count) {
+    const countHtml = count === undefined ? "" : ` <span class="chip-count">(${count})</span>`;
+    return `<button class="chip" data-group="${group}" data-value="${escapeHtml(value)}">${escapeHtml(label)}${countHtml}</button>`;
   }
 
   function fillSelect(select, options) {
-    select.innerHTML = options.map((o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join("");
+    select.innerHTML = options
+      .map((o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}${o.count === undefined ? "" : ` (${o.count})`}</option>`)
+      .join("");
   }
 
   // ---------- filtering ----------
 
-  function applyPredicate(d, f) {
-    if (f.stage === "Sem conta") {
-      if (d.account) return false;
-    } else if (f.stage !== "all" && d.deal_stage !== f.stage) {
-      return false;
+  // skipField deixa de fora uma dimensão do próprio filtro — usado pelos
+  // gráficos do dashboard pra sempre mostrar o panorama completo daquilo
+  // que eles mesmos controlam, em vez de colapsar quando você filtra
+  // clicando numa barra do próprio gráfico.
+  function applyPredicate(d, f, skipField) {
+    if (skipField !== "stage") {
+      if (f.stage === "Sem conta") {
+        if (d.account) return false;
+      } else if (f.stage !== "all" && d.deal_stage !== f.stage) {
+        return false;
+      }
     }
-    if (f.region !== "all" && d.regional_office !== f.region) return false;
-    if (f.manager !== "all" && d.manager !== f.manager) return false;
-    if (f.agent !== "all" && d.sales_agent !== f.agent) return false;
+    if (skipField !== "region" && f.region !== "all" && d.regional_office !== f.region) return false;
+    if (skipField !== "manager" && f.manager !== "all" && d.manager !== f.manager) return false;
+    if (skipField !== "agent" && f.agent !== "all" && d.sales_agent !== f.agent) return false;
     if (state.search) {
       const hay = (d.account + " " + d.product).toLowerCase();
       if (!hay.includes(state.search)) return false;
@@ -425,19 +457,21 @@
   }
 
   // Clicar num gráfico do dashboard aplica o filtro correspondente e refaz
-  // os gráficos na hora — cross-filtering, sem sair da view. O filtro fica
-  // valendo se o usuário for pra Lista/Kanban depois.
-  function filterInPlace(patch) {
-    Object.assign(state, patch);
+  // os gráficos na hora — cross-filtering, sem sair da view. Clicar de novo
+  // na mesma barra remove o filtro (toggle). O filtro fica valendo se o
+  // usuário for pra Lista/Kanban depois.
+  function filterInPlace(field, value) {
+    state[field] = state[field] === value ? "all" : value;
     visibleCount = PAGE_SIZE;
     paintFilterDot();
+    paintActiveFilters();
     renderDashboard();
   }
 
-  function barClickHandler(getPatch) {
+  function barClickHandler(field, getValue) {
     return (evt, elements) => {
       if (!elements.length) return;
-      filterInPlace(getPatch(elements[0].index));
+      filterInPlace(field, getValue(elements[0].index));
     };
   }
 
@@ -445,18 +479,22 @@
     evt.native.target.style.cursor = elements.length ? "pointer" : "default";
   }
 
-  function renderMeter(matches, noAccount) {
-    const pct = matches.length ? Math.round((noAccount.length / matches.length) * 100) : 0;
-    const sumEst = noAccount.reduce((s, d) => s + d.score.estimated_value, 0);
-    els.meterFill.style.width = pct + "%";
-    els.meterValue.textContent = pct + "%";
-    els.meterSub.textContent =
-      `${noAccount.length.toLocaleString("pt-BR")} de ${matches.length.toLocaleString("pt-BR")} deals abertos · ${compactCurrency(sumEst)} em estimativa`;
+  // Em vez de recalcular a barra a partir dos dados já filtrados por ela
+  // mesma (o que faria as outras opções somem/zerarem ao clicar), cada
+  // gráfico ignora o próprio filtro no cálculo e só destaca com opacidade
+  // reduzida as barras que não são a seleção atual — o panorama completo
+  // continua visível, só menos evidente.
+  function opacityColors(baseColors, categories, activeValue) {
+    if (activeValue === "all") return baseColors;
+    return categories.map((cat, i) => (cat === activeValue ? baseColors[i] : hexToRgba(baseColors[i], 0.25)));
   }
 
-  function renderStageChart(withAccount, noAccount) {
+  function renderStageChart() {
     const stages = ["Prospecting", "Engaging", "Sem conta"];
-    const colors = [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--ink-muted")];
+    const baseColors = [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--ink-muted")];
+    const pool = ALL_DEALS.filter((d) => applyPredicate(d, state, "stage"));
+    const withAccount = pool.filter((d) => d.account);
+    const noAccount = pool.filter((d) => !d.account);
     const counts = [
       withAccount.filter((d) => d.deal_stage === "Prospecting").length,
       withAccount.filter((d) => d.deal_stage === "Engaging").length,
@@ -467,11 +505,12 @@
       withAccount.filter((d) => d.deal_stage === "Engaging").reduce((s, d) => s + d.score.expected_value, 0),
       noAccount.reduce((s, d) => s + d.score.estimated_value, 0),
     ];
+    const colors = opacityColors(baseColors, stages, state.stage);
     upsertChart("stage", "chart-stage", {
       type: "bar",
       data: { labels: stages, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
       options: baseChartOptions({
-        onClick: barClickHandler((i) => ({ stage: stages[i] })),
+        onClick: barClickHandler("stage", (i) => stages[i]),
         onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: {
           title: (items) => stages[items[0].dataIndex],
@@ -480,10 +519,11 @@
         scales: { y: { ticks: { callback: (v) => compactCurrency(v) } } },
       }),
     });
-    renderLegend("legend-stage", stages.map((s, i) => ({ label: s, color: colors[i], sub: `${counts[i]} deals · ${compactCurrency(values[i])}` })));
+    renderLegend("legend-stage", stages.map((s, i) => ({ label: s, color: baseColors[i], sub: `${counts[i]} deals · ${compactCurrency(values[i])}` })));
   }
 
-  function renderPriorityChart(withAccount) {
+  function renderPriorityChart() {
+    const withAccount = ALL_DEALS.filter((d) => applyPredicate(d, state)).filter((d) => d.account);
     const buckets = [];
     for (let i = 0; i < 10; i++) buckets.push({ lo: i * 10, hi: i === 9 ? 100 : i * 10 + 9, label: i === 9 ? "90–100" : `${i * 10}–${i * 10 + 9}` });
     const counts = buckets.map((b) => withAccount.filter((d) => d.score.priority_score >= b.lo && d.score.priority_score <= b.hi).length);
@@ -498,17 +538,20 @@
     });
   }
 
-  function renderManagerChart(withAccount) {
-    const byManager = groupSum(withAccount, (d) => d.manager || "—");
+  function renderManagerChart() {
+    const pool = ALL_DEALS.filter((d) => applyPredicate(d, state, "manager")).filter((d) => d.account);
+    const byManager = groupSum(pool, (d) => d.manager || "—");
     const rows = Array.from(byManager.entries())
       .map(([manager, v]) => ({ manager, value: v.value, count: v.count }))
       .sort((a, b) => b.value - a.value);
+    const base = cssVar("--chart-1");
+    const colors = rows.map((r) => (state.manager === "all" || state.manager === r.manager ? base : hexToRgba(base, 0.25)));
     upsertChart("manager", "chart-manager", {
       type: "bar",
-      data: { labels: rows.map((r) => r.manager), datasets: [{ data: rows.map((r) => r.value), backgroundColor: cssVar("--chart-1"), borderRadius: 4, maxBarThickness: 20 }] },
+      data: { labels: rows.map((r) => r.manager), datasets: [{ data: rows.map((r) => r.value), backgroundColor: colors, borderRadius: 4, maxBarThickness: 20 }] },
       options: baseChartOptions({
         indexAxis: "y",
-        onClick: barClickHandler((i) => ({ manager: rows[i].manager })),
+        onClick: barClickHandler("manager", (i) => rows[i].manager),
         onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: { label: (item) => [compactCurrency(item.parsed.x), `${rows[item.dataIndex].count} deals`] } } },
         scales: { x: { ticks: { callback: (v) => compactCurrency(v) } }, y: { grid: { display: false } } },
@@ -516,16 +559,18 @@
     });
   }
 
-  function renderRegionChart(withAccount) {
+  function renderRegionChart() {
+    const pool = ALL_DEALS.filter((d) => applyPredicate(d, state, "region")).filter((d) => d.account);
     const regions = ["Central", "East", "West"];
-    const colors = [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--chart-3")];
-    const counts = regions.map((r) => withAccount.filter((d) => d.regional_office === r).length);
-    const values = regions.map((r) => withAccount.filter((d) => d.regional_office === r).reduce((s, d) => s + d.score.expected_value, 0));
+    const baseColors = [cssVar("--chart-1"), cssVar("--chart-2"), cssVar("--chart-3")];
+    const counts = regions.map((r) => pool.filter((d) => d.regional_office === r).length);
+    const values = regions.map((r) => pool.filter((d) => d.regional_office === r).reduce((s, d) => s + d.score.expected_value, 0));
+    const colors = opacityColors(baseColors, regions, state.region);
     upsertChart("region", "chart-region", {
       type: "bar",
       data: { labels: regions, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, maxBarThickness: 56 }] },
       options: baseChartOptions({
-        onClick: barClickHandler((i) => ({ region: regions[i] })),
+        onClick: barClickHandler("region", (i) => regions[i]),
         onHover: barHoverHandler,
         plugins: { tooltip: { callbacks: {
           title: (items) => regions[items[0].dataIndex],
@@ -534,19 +579,16 @@
         scales: { y: { ticks: { callback: (v) => compactCurrency(v) } } },
       }),
     });
-    renderLegend("legend-region", regions.map((r, i) => ({ label: r, color: colors[i], sub: `${counts[i]} deals · ${compactCurrency(values[i])}` })));
+    renderLegend("legend-region", regions.map((r, i) => ({ label: r, color: baseColors[i], sub: `${counts[i]} deals · ${compactCurrency(values[i])}` })));
   }
 
   function renderDashboard() {
     const matches = ALL_DEALS.filter((d) => applyPredicate(d, state));
-    const withAccount = matches.filter((d) => d.account);
-    const noAccount = matches.filter((d) => !d.account);
     setResultCount(`${matches.length} deal${matches.length === 1 ? "" : "s"} encontrado${matches.length === 1 ? "" : "s"}`);
-    renderMeter(matches, noAccount);
-    renderStageChart(withAccount, noAccount);
-    renderPriorityChart(withAccount);
-    renderManagerChart(withAccount);
-    renderRegionChart(withAccount);
+    renderStageChart();
+    renderPriorityChart();
+    renderManagerChart();
+    renderRegionChart();
   }
 
   function cardHtml(d, compact) {
@@ -724,6 +766,35 @@
     els.filterDotDesktop.hidden = !active;
   }
 
+  const FILTER_LABELS = { stage: "Estágio", region: "Região", manager: "Manager", agent: "Vendedor" };
+
+  // Badges abaixo da busca mostrando cada filtro ativo, com X pra remover
+  // individualmente (os dados voltam ao estado sem aquele filtro).
+  function paintActiveFilters() {
+    const active = Object.keys(FILTER_LABELS).filter((key) => state[key] !== "all");
+    els.activeFilters.hidden = active.length === 0;
+    els.activeFilters.innerHTML = "";
+    active.forEach((key) => {
+      const chip = document.createElement("span");
+      chip.className = "active-filter-chip";
+      const label = document.createElement("span");
+      label.textContent = `${FILTER_LABELS[key]}: ${state[key]}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "×";
+      btn.setAttribute("aria-label", `Remover filtro ${FILTER_LABELS[key]}`);
+      btn.addEventListener("click", () => {
+        state[key] = "all";
+        visibleCount = PAGE_SIZE;
+        paintFilterDot();
+        paintActiveFilters();
+        render();
+      });
+      chip.append(label, btn);
+      els.activeFilters.appendChild(chip);
+    });
+  }
+
   // ---------- wiring ----------
 
   function setView(view) {
@@ -764,7 +835,6 @@
     initViewSwitch();
     setView(currentView);
     window.addEventListener("resize", sizeKanbanBoard);
-    els.dashCardMeter.addEventListener("click", () => filterInPlace({ stage: "Sem conta" }));
 
     els.btnMenu.addEventListener("click", () => {
       els.drawer.classList.remove("hidden");

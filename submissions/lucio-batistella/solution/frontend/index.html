@@ -158,6 +158,8 @@
         </div>
       </div>
 
+      <div id="active-filters" class="active-filters" hidden></div>
+
       <p id="result-count" class="result-count" aria-live="polite"></p>
 
       <div id="view-list">
@@ -170,15 +172,6 @@
 
       <div id="view-dashboard" class="dashboard-view" hidden data-palette="#2E6DA4,#D9A441,#2E9E8C">
         <div class="dash-grid">
-          <div class="dash-card dash-card-meter dash-card-clickable" id="dash-card-meter">
-            <div class="dash-card-title">Conta não identificada no CRM</div>
-            <div class="meter">
-              <div class="meter-track"><div class="meter-fill" id="meter-no-account-fill"></div></div>
-              <div class="meter-value" id="meter-no-account-value">—</div>
-            </div>
-            <p class="meter-sub" id="meter-no-account-sub"></p>
-            <p class="dash-card-hint">Clique pra filtrar por esses deals</p>
-          </div>
           <div class="dash-card">
             <div class="dash-card-title">Pipeline por estágio</div>
             <div class="dash-chart-wrap"><canvas id="chart-stage" role="img" aria-label="Deals e valor esperado por estágio"></canvas></div>

@@ -9,7 +9,7 @@
 ## Links públicos
 
 - **App ao vivo:** https://purple-swallow-825851.hostingersite.com/
-  ⚠️ A hospedagem é estática (sem o backend Node rodando), então o "Perguntar à IA" mostra o aviso de fallback ali — funciona de verdade rodando localmente com o backend (veja Setup). Além disso, a Hostinger usa um CDN em frente ao site com cache agressivo; se a versão que aparecer parecer desatualizada, é esse cache, não o código — os arquivos publicados já estão corretos.
+  ⚠️ A hospedagem é estática (sem o backend Node rodando), então o "Perguntar à IA" mostra o aviso de fallback ali — funciona de verdade rodando localmente com o backend (veja Setup).
 - **Design canvas (protótipo visual, v1):** https://claude.ai/artifact/SH2AwCQRMtwpox7V3VQx7Z
 
 ---
